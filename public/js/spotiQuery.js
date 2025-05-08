@@ -27,7 +27,13 @@ document.getElementById('searchInput').addEventListener('input', function() {
     if (!query) return;
 
     fetch(`/search?query=${encodeURIComponent(query)}`)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                resultsContainer.innerHTML = '<p>too many requests :(</p>';
+                throw (response.status);
+            }
+            return response.json();
+        })
         .then(data => {
             resultsContainer.innerHTML = '';
 
@@ -59,11 +65,14 @@ document.getElementById('searchInput').addEventListener('input', function() {
                                 'UserID': userId,
                             },
                             body: JSON.stringify({id : track.id})
-                        }).then(data => {
+                        }).then(response => response.json())
+                        .then(data => {
                             console.log('API response:', data);
-                            alert(`Vote registered for: ${track.name}`);
+                            if(data.success)
+                                alert(data.message);
+                            else
+                                alert(data.message + " for " + data.name);
                         })
-                            
                     });
                     
                     resultsContainer.appendChild(trackElement);

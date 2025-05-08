@@ -10,8 +10,12 @@ const rateLimit = require('express-rate-limit');
 
 const voteLimiter = rateLimit({
     rateLimitMS: 60 * 1000, 
-    reqeustN: 1,
-    message: "too many request"
+    reqeustN: 1
+});
+
+const searchLimiter = rateLimit({
+    rateLimitMS: 50, 
+    reqeustN: 5
 });
 
 const port = process.env.PORT || 6969;
@@ -85,7 +89,7 @@ async function TOKEN(FORCENEW = false) {
     }
 }
 
-app.get('/search', async (req, res) => {
+app.get('/search', searchLimiter, async (req, res) => {
     const query = req.query.query;
     if (query == "") return res.status(400).send('EMPTY QUERY');
 
@@ -111,25 +115,17 @@ app.get('/search', async (req, res) => {
     }
 });
 
-app.post('/vote', voteLimiter, (req, res) => {
+app.post('/vote', voteLimiter, async (req, res) => {
     try{
         const userid = req.get('UserID');
         const songID = req.body.id;
 
+        const token = await TOKEN();
+
         console.log('Vote received for track:', songID, "by", userid);
 
-        if (!/^[a-fA-F0-9]{36}$/.test(songID)) {
-            console.log('Vote deleted for track:', songID, "by", userid);
-            return res.status(400).send('wrong songID format');
-        }
-        
-        if (!/^[a-fA-F0-9]{36}$/.test(userid)) {
-            console.log('Vote deleted for track:', songID, "by", userid);
-            return res.status(400).send('wrong userID format');
-        }
-
         connection.query(
-			"SELECT VOTE_ID FROM votes WHERE cookie = ?;",
+			"SELECT * FROM votes WHERE cookie = ?;",
 			[userid],
 			(err,result) => {
 			if(err) throw err;
@@ -142,11 +138,28 @@ app.post('/vote', voteLimiter, (req, res) => {
                         if(err) throw err;
                     });
                     console.log('Vote confirmed for track:', songID, "by", userid);
-                    res.json({ message: 'Vote registered successfully', track: songID });
+                    res.json({
+                        success : 1,
+                        message: 'Voted successfully',
+                        track: songID
+                    });
                 }
                 else {
                     console.log('Vote deleted for track:', songID, "by", userid);
-                    res.json({ message: 'Already voted for', track: songID});
+                        axios.get(`https://api.spotify.com/v1/tracks/${result[0].idsong}`, {
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            }
+                        })
+                        .then(response => {
+                            const name = response.data.name;
+                            res.json({
+                                success : 0,
+                                message: 'Already voted',
+                                track: songID,
+                                name: name
+                            });
+                        });
                 }
             }
 		});
