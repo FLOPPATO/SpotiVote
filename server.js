@@ -2,21 +2,13 @@ const express = require('express');
 const axios = require('axios');
 require('dotenv').config();
 const path = require('path');
-const mysql = require('mysql');
 const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
-const rateLimit = require('express-rate-limit');
+const authController = require('./authHandler.js');
+const authMiddleware = require('./middleware/authMiddleW.js');
+const { connection }= require('./connection.js');
 
-const voteLimiter = rateLimit({
-    rateLimitMS: 60 * 1000, 
-    reqeustN: 1
-});
-
-const searchLimiter = rateLimit({
-    rateLimitMS: 50, 
-    reqeustN: 5
-});
 
 const port = process.env.PORT || 6969;
 const ID = process.env.CLIENT_ID || null;
@@ -24,51 +16,16 @@ const SECRET = process.env.CLIENT_SECRET || null;
 
 let token = {token : null , expire : null};
 
-const settings = {
-    CLEARDB : process.env.CLEARDB,
 
-}
-
-var connection = mysql.createConnection({
-	host : process.env.DBHOST,
-	user : process.env.DBUSER,
-	password : process.env.DBPWD
-});
-
-connection.connect((err) => {
-    if(err) throw err;
-    
-    const TABLECREATE = `
-        CREATE TABLE IF NOT EXISTS votes (
-            VOTE_ID INT(11) NOT NULL AUTO_INCREMENT,
-            cookie CHAR(36) NOT NULL,
-            idsong CHAR(36) NOT NULL,
-            timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (VOTE_ID)
-        )`;
-
-    connection.query("CREATE DATABASE IF NOT EXISTS spotivote",function(err,result){
-		if(err) throw err;
-	});
-	connection.query("USE spotivote",function(err,result){
-		if(err) throw err;
-	});
-    connection.query(TABLECREATE, function(err, result) {
-        if (err) throw err;
-    });
-    if(settings.CLEARDB.toUpperCase() == "TRUE"){
-        connection.query("TRUNCATE TABLE votes", function(err, result) {
-            if (err) throw err;
-        });
-    }
-
-	console.log("connected to DB");
-});
 
 async function TOKEN(FORCENEW = false) {
     try {
+        if(!ID || !SECRET){
+            throw new Error("no spotify credentials (FIX IN .env)");
+        }
+
         const TIME = Date.now();
-        if(FORCENEW || token == null || TIME >= token.expire){
+        if(FORCENEW || token.token == null || TIME >= token.expire){
 
             const response = await axios.post('https://accounts.spotify.com/api/token', 
                 new URLSearchParams({ grant_type: 'client_credentials' }).toString(), {
@@ -78,8 +35,10 @@ async function TOKEN(FORCENEW = false) {
                 }
             });
     
-            token.token = response.data.access_token;
-            token.expire = TIME + (response.data.expires_in * 1000);
+            token = {
+                token: response.data.access_token,
+                expire: TIME + (response.data.expires_in * 1000)
+            };
         }
         return token.token;
 
@@ -89,7 +48,7 @@ async function TOKEN(FORCENEW = false) {
     }
 }
 
-app.get('/search', searchLimiter, async (req, res) => {
+app.get('/search', async (req, res) => {
     const query = req.query.query;
     if (query == "") return res.status(400).send('EMPTY QUERY');
 
@@ -109,35 +68,36 @@ app.get('/search', searchLimiter, async (req, res) => {
 
         res.json(response.data.tracks.items);
     } catch (error) {
-		await TOKEN(true);
         console.error(error);
         res.status(500).send('ERR');
     }
 });
 
-app.post('/vote', voteLimiter, async (req, res) => {
+app.post('/vote', authMiddleware.protect,  async (req, res) => {  //IMPLEMENTARE FRONTEND 🙏💀
+                                                                  //error handling trovare modo
+                                                                  //(manda il json nella catch)
     try{
-        const userid = req.get('UserID');
+        const user = req.user.id;
         const songID = req.body.id;
 
         const token = await TOKEN();
 
-        console.log('Vote received for track:', songID, "by", userid);
+        console.log('Vote received for track:', songID, "by", user);
 
         connection.query(
-			"SELECT * FROM votes WHERE cookie = ?;",
-			[userid],
+			"SELECT * FROM votes WHERE user = ?;",
+			[user],
 			(err,result) => {
 			if(err) throw err;
             if(result) { 
                 if(result.length == 0){
                     connection.query(
-                        "INSERT INTO `votes` (`cookie`, `idsong`) VALUES (?, ?);",
-                        [userid, songID],
+                        "INSERT INTO `votes` (`user`, `idsong`) VALUES (?, ?);",
+                        [user, songID],
                         (err,result) => {
                         if(err) throw err;
                     });
-                    console.log('Vote confirmed for track:', songID, "by", userid);
+                    console.log('Vote confirmed for track:', songID, "by", user);
                     res.json({
                         success : 1,
                         message: 'Voted successfully',
@@ -145,7 +105,7 @@ app.post('/vote', voteLimiter, async (req, res) => {
                     });
                 }
                 else {
-                    console.log('Vote deleted for track:', songID, "by", userid);
+                    console.log('Vote deleted for track:', songID, "by", user);
                         axios.get(`https://api.spotify.com/v1/tracks/${result[0].idsong}`, {
                             headers: {
                                 'Authorization': `Bearer ${token}`
@@ -170,7 +130,12 @@ app.post('/vote', voteLimiter, async (req, res) => {
         console.error(error);
         res.status(500).send('ERR');
     }
-});	
+});
+
+app.post('/register', authController.register);
+app.post('/login', authController.login);
+
+
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public/html', 'index.html'));

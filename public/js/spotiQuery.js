@@ -1,23 +1,3 @@
-function getOrSetUserId() {
-    let userId = getCookie('userId');
-    if (!userId) {
-        userId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c =>
-                    (Math.random() * 16 | 0).toString(16)
-                    );
-        const cookieString = `userId=${userId}; max-age=86400; path=/; SameSite=Strict` +
-            (window.location.protocol === 'https:' ? '; Secure' : '');
-        document.cookie = cookieString;
-    }
-    return userId;
-}
-
-function getCookie(name) {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop().split(';').shift();
-}
-
-
 const resultsContainer = document.getElementById('resultsContainer');
 
 document.getElementById('searchInput').addEventListener('input', function() {
@@ -54,15 +34,13 @@ document.getElementById('searchInput').addEventListener('input', function() {
                     
                     
                     trackElement.addEventListener('click', async function() {
-                        const userId = await getOrSetUserId();
 
-                        console.log(userId);
-                        
                         fetch("/vote", {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'UserID': userId,
+                                //handle dynamic token plz 
+                                'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNhYW8iLCJpYXQiOjE3NDc2ODU2NzQsImV4cCI6MTc0Nzc3MjA3NH0.LsI_sKwtsdEjffxCMOG6lj-e1QNF9YbrqtpnXGzoB8U`
                             },
                             body: JSON.stringify({id : track.id})
                         }).then(response => response.json())
