@@ -143,6 +143,49 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public/html', 'index.html'));
 });
 
+app.get('/api/votes', async (req, res) => {
+    try {
+        connection.query(
+            `SELECT idsong AS track_id, COUNT(*) AS votes
+             FROM votes
+             GROUP BY idsong`,
+            (err, results) => {
+                if (err) {
+                    console.error('DB error:', err);
+                    return res.status(500).json({ error: 'Database query failed' });
+                }
+                res.json(results);
+            }
+        );
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Unexpected server error' });
+    }
+});
+
+app.get('/track/:id', async (req, res) => {
+  try {
+    const tokenVal = await TOKEN();
+    const trackId = req.params.id;
+
+    const response = await axios.get(`https://api.spotify.com/v1/tracks/${trackId}`, {
+      headers: {
+        Authorization: `Bearer ${tokenVal}`
+      }
+    });
+
+    res.json({
+      id: trackId,
+      name: response.data.name
+    });
+
+  } catch (err) {
+    console.error('Failed to fetch track:', err);
+    res.status(500).json({ name: 'Unknown' });
+  }
+});
+
+
 app.listen(port, () => {
     console.log(`http://localhost:${port}`);
 });

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SpotiVote Results</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      background-color: #f4f4f4;
+    }
+    canvas {
+      margin-top: 40px;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 15px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Vote Results</h1>
+  <canvas id="bubbleChart" width="400" height="200"></canvas>
+  <button onclick="window.location.href='index.html'">Back to Voting</button>
+
+  <script>
+    async function getSpotifyToken() {
+      // Dummy query to trigger backend token setup
+      const res = await fetch('/search?query=test');
+      return res.ok;
+    }
+
+    async function fetchVotes() {
+      const res = await fetch('/api/votes');
+      return await res.json();
+    }
+
+    async function fetchTrackName(trackId) {
+        const res = await fetch(`/track/${trackId}`);
+        const data = await res.json();
+        return data.name || 'Unknown';
+    }
+
+
+    async function drawBubbleChart() {
+        const ctx = document.getElementById('bubbleChart').getContext('2d');
+
+        const voteData = await fetchVotes();
+        console.log("Vote data:", voteData);
+
+        const bubbles = await Promise.all(voteData.map(async (song) => {
+        const name = await fetchTrackName(song.track_id);
+        return {
+            name,
+            votes: song.votes,
+            // other props...
+        };
+        }));
+
+        const chart = new Chart(ctx, {
+          type: 'bubble',
+          data: {
+            datasets: bubbles.map((song, index) => {
+              const { bg, border } = getRandomColor();
+              return {
+                label: song.name,
+                data: [{
+                  x: Math.random() * 50 + 35,
+                  y: Math.random() * 40 + 35,
+                  r: Math.min(song.votes * 2 + 10, 50)
+                }],
+                backgroundColor: bg,
+                borderColor: border,
+                borderWidth: 1,
+                votes: song.votes
+              };
+            })
+        },
+        options: {
+            plugins: {
+            tooltip: {
+                callbacks: {
+                label: (context) => {
+                    const dataset = context.dataset;
+                    return `${dataset.label} — ${dataset.votes} vote${dataset.votes === 1 ? '' : 's'}`;
+                }
+                }
+            },
+            datalabels: {
+                color: '#845',
+                font: { weight: 'bold', size: 12 },
+                formatter: (value, context) => context.dataset.label,
+                align: 'center',
+                anchor: 'center',
+                clamp: true
+            },
+            legend: { display: false }
+            },
+            scales: {
+            x: { min: 0, max: 100, display: false },
+            y: { display: false }
+            }
+        },
+        plugins: [ChartDataLabels]
+        });
+    }
+    function getRandomColor() {
+        const r = Math.floor(Math.random() * 200) + 30;  // 30-230 to avoid too dark/light
+        const g = Math.floor(Math.random() * 200) + 30;
+        const b = Math.floor(Math.random() * 200) + 30;
+        return {
+            bg: `rgba(${r}, ${g}, ${b}, 0.6)`,
+            border: `rgba(${r}, ${g}, ${b}, 1)`
+        };
+    }
+
+
+    drawBubbleChart();
+  </script>
+</body>
+</html>
