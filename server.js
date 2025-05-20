@@ -80,12 +80,14 @@ app.post('/vote', authMiddleware.protect,  async (req, res) => {  //IMPLEMENTARE
         const user = req.user.id;
         const songID = req.body.id;
 
+        console.log(user+""+songID);
+
         const token = await TOKEN();
 
         console.log('Vote received for track:', songID, "by", user);
 
         connection.query(
-			"SELECT * FROM votes WHERE user = ?;",
+			"SELECT * FROM users u JOIN votes v on v.user = u.user WHERE u.user = ?;",
 			[user],
 			(err,result) => {
 			if(err) throw err;
@@ -105,21 +107,21 @@ app.post('/vote', authMiddleware.protect,  async (req, res) => {  //IMPLEMENTARE
                     });
                 }
                 else {
-                    console.log('Vote deleted for track:', songID, "by", user);
-                        axios.get(`https://api.spotify.com/v1/tracks/${result[0].idsong}`, {
-                            headers: {
-                                'Authorization': `Bearer ${token}`
-                            }
-                        })
-                        .then(response => {
-                            const name = response.data.name;
-                            res.json({
-                                success : 0,
-                                message: 'Already voted',
-                                track: songID,
-                                name: name
-                            });
+                    console.log('Vote deleted for track:', result[0].idsong, "by", user);
+                    axios.get(`https://api.spotify.com/v1/tracks/${result[0].idsong}`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    })
+                    .then(response => {
+                        const name = response.data.name;
+                        res.json({
+                            success : 0,
+                            message: 'Already voted',
+                            track: songID,
+                            name: name
                         });
+                    });
                 }
             }
 		});

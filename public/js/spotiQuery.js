@@ -124,7 +124,7 @@ document.getElementById('searchInput').addEventListener('input', function() {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                //handle dynamic token plz 
+                                //handle dynamic token plz  DONE
                                 'Authorization': `Bearer ${token}`
                             },
                             body: JSON.stringify({id : track.id})

@@ -15,12 +15,13 @@ connection.connect((err) => {
     
     const TABLECREATE = `
         CREATE TABLE IF NOT EXISTS votes (
-            VOTE_ID INT(11)  AUTO_INCREMENT,
-            user INT(11) NOT NULL REFERENCES users(USER_ID),
+            VOTE_ID INT(11) AUTO_INCREMENT,
+            user char(50) NOT NULL,
             idsong CHAR(36) NOT NULL,
             timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (VOTE_ID)
-        )`;
+            PRIMARY KEY (VOTE_ID),
+            FOREIGN KEY (user) REFERENCES users(user)
+        );`;
 
     const USERTABLECREATE = `
         CREATE TABLE IF NOT EXISTS users (
