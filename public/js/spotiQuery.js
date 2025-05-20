@@ -1,3 +1,82 @@
+const loginModal = document.getElementById('loginModal');
+const closeButton = document.querySelector('.close');
+const loginSubmit = document.getElementById('loginSubmit');
+
+const registerSubmit = document.getElementById('registerSubmit');
+
+
+function showhideModal(alt = 0) {
+    //0 alternate 1 force true 2 force false
+    if(alt == 0)
+        loginModal.style.display = loginModal.style.display == 'none'?'block':'none';
+    else if(alt == 1)
+        loginModal.style.display = 'block';
+    else if(alt == 2)
+        loginModal.style.display = 'none';
+}
+
+closeButton.onclick = () => showhideModal(2);
+
+window.onclick = function(event) {
+    if (event.target == loginModal) {
+        showhideModal(2);
+    }
+}
+
+loginSubmit.onclick = async function () {
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+
+    try {
+        const res = await fetch('/login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ username, password })
+        });
+
+        const data = await res.json();
+
+        if (data.token) {
+            localStorage.setItem('token', data.token);
+            showhideModal(2);
+            alert('Login andato bene. Rivota');
+        } else {
+            alert('login sbagliato: ' + data.message);
+        }
+    } catch (err) {
+        alert('errore nel login');
+        console.error(err);
+    }
+};
+
+registerSubmit.onclick = async function () {
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+
+    try {
+        const res = await fetch('/register', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ username, password })
+        });
+
+        const data = await res.json();
+
+        if (data.token) {
+            localStorage.setItem('token', data.token);
+            showhideModal(2);
+            alert('register andato bene. Rivota');
+        } else {
+            alert('register errore: ' + data.message);
+        }
+    } catch (err) {
+        alert('errore nel login');
+        console.error(err);
+    }
+};
+
+
+
 const resultsContainer = document.getElementById('resultsContainer');
 
 document.getElementById('searchInput').addEventListener('input', function() {
@@ -34,16 +113,23 @@ document.getElementById('searchInput').addEventListener('input', function() {
                     
                     
                     trackElement.addEventListener('click', async function() {
+                        const token = localStorage.getItem('token');
+
+                        if (!token) {
+                            showhideModal(1);
+                            return;
+                        }
 
                         fetch("/vote", {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
                                 //handle dynamic token plz 
-                                'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImNhYW8iLCJpYXQiOjE3NDc2ODU2NzQsImV4cCI6MTc0Nzc3MjA3NH0.LsI_sKwtsdEjffxCMOG6lj-e1QNF9YbrqtpnXGzoB8U`
+                                'Authorization': `Bearer ${token}`
                             },
                             body: JSON.stringify({id : track.id})
-                        }).then(response => response.json())
+                        })
+                        .then(response => response.json())
                         .then(data => {
                             console.log('API response:', data);
                             if(data.success)
